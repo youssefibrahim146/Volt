@@ -6,7 +6,9 @@ import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
 import 'express-async-errors';
-
+import router from './src/api';
+import { Router } from 'express';
+const appRouter = Router();
 dotenv.config();
 
 const app = express();
@@ -31,6 +33,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
+appRouter.use('/api', router);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
