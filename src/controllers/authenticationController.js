@@ -1,5 +1,3 @@
-import { Router } from "express";
-const router = Router();
 import { PrismaClient } from "@prisma/client";
 import { hashPassword, comparePassword, generateToken, verifyToken } from "../utils";
 const prisma = new PrismaClient();
@@ -115,3 +113,5 @@ async function deleteUser(req, res) {
     });
     res.status(204).json();
 }
+
+export { registerUser, loginUser, getUser, updateUser, deleteUser };
