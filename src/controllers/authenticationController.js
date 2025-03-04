@@ -1,7 +1,7 @@
 import { Router } from "express";
 const router = Router();
 import { PrismaClient } from "@prisma/client";
-import { hashPassword, comparePassword, generateToken, verifyToken } from "../utils/bcrypt.js";
+import { hashPassword, comparePassword, generateToken, verifyToken } from "../utils";
 const prisma = new PrismaClient();
 
 /**
