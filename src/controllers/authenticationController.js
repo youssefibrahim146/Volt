@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { hashPassword, comparePassword, generateToken, verifyToken } from "../utils";
+import { hashPassword, comparePassword, generateToken, verifyToken } from "../utils.js";
 const prisma = new PrismaClient();
 
 /**
@@ -10,9 +10,10 @@ const prisma = new PrismaClient();
  */
 async function registerUser(req, res) {
     const { userName, email, password, budget = 0, totalVoltage = 0, minBudget = 0 } = req.body;
-    // Validate required fields
+console.log("registerUser");
+    console.log(req.body);
     if (!userName || !email || !password) {
-        return res.status(400).json({ message: "All fields are required" });
+        return res.status(400).json({ message: "All fields are required email, password, userName" });
     }
     const hashedPassword = await hashPassword(password);
     const user = await prisma.user.create({
