@@ -22,3 +22,34 @@ model User {
   totalVoltage Int
   minBudget Int
 }
+model admin{
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  password String
+}
+
+model systemDevice{
+  id    Int     @id
+  name String
+  img String
+  VoltagesAvailable   Int[]
+  deviceWorkAllDay   Boolean
+}
+
+model userHomeDevice{
+  id    Int     @id
+  userInputWorkTime Int
+  userId  Int
+  systemDeviceId Int
+
+  user User @relation(fields: [userId], references: [id])
+  systemDevice systemDevice @relation(fields: [systemDeviceId], references: [id])
+}
+model userHomeDevices {
+  id    Int     @id
+  userId  Int
+  systemDeviceId Int
+
+  user User @relation(fields: [userId], references: [id])
+  systemDevice systemDevice @relation(fields: [systemDeviceId], references: [id])
+}
