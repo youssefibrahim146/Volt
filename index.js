@@ -1,4 +1,3 @@
-
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
@@ -6,7 +5,7 @@ import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
 import 'express-async-errors';
-import router from './src/api';
+import router from './src/api/index.js';
 import { Router } from 'express';
 const appRouter = Router();
 dotenv.config();
