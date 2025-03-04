@@ -1,4 +1,4 @@
-import { verifyToken } from "../utils";
+import { verifyToken } from "../utils.js";
 
 /**
  * Middleware to authenticate requests.
