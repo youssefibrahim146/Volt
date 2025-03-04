@@ -27,12 +27,15 @@ app.get('/users', async (req, res) => {
   res.json(users);
 });
 
+// Add the API routes to the main Express app
+appRouter.use('/api', router);
+app.use(appRouter);
+
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({ error: err.message });
 });
 
-appRouter.use('/api', router);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
