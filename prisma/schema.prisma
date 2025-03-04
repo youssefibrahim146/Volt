@@ -7,6 +7,7 @@
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
 }
 
 generator client {
@@ -21,6 +22,10 @@ model User {
   budget Int
   totalVoltage Int
   minBudget Int
+
+  userHomeDevices userHomeDevices[]
+
+  userHomeDevice userHomeDevice[]
 }
 model admin{
   id    Int     @id @default(autoincrement())
@@ -34,6 +39,10 @@ model systemDevice{
   img String
   VoltagesAvailable   Int[]
   deviceWorkAllDay   Boolean
+
+  userHomeDevices userHomeDevices[]
+
+  userHomeDevice userHomeDevice[]
 }
 
 model userHomeDevice{

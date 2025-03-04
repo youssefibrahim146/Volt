@@ -1,4 +1,3 @@
-
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
@@ -6,7 +5,9 @@ import morgan from 'morgan';
 import cors from 'cors';
 import helmet from 'helmet';
 import 'express-async-errors';
-
+import router from './src/api/index.js';
+import { Router } from 'express';
+const appRouter = Router();
 dotenv.config();
 
 const app = express();
@@ -25,6 +26,10 @@ app.get('/users', async (req, res) => {
   const users = await prisma.user.findMany();
   res.json(users);
 });
+
+// Add the API routes to the main Express app
+appRouter.use('/api', router);
+app.use(appRouter);
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);
