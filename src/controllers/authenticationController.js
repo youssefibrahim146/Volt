@@ -157,4 +157,27 @@ async function createAdmin(req, res) {
     }
 }
 
+async function loginAdmin(req, res) {
+    try {
+        if (!req.body.email || !req.body.password) {
+            return res.status(400).json({ message: "All fields are required" });
+        }
+        const admin = await prisma.admin.findUnique({
+            where: { email: req.body.email }
+        });
+        if (!admin) {
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+        const isPasswordMatch = await comparePassword(req.body.password, admin.password);
+        if (!isPasswordMatch) {
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+        const token = generateToken(admin);
+        res.status(200).json({ token });
+    } catch (error) {
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
+
 export { registerUser, loginUser, getUser, updateUser, deleteUser  , createAdmin};
