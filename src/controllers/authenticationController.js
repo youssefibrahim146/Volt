@@ -180,4 +180,4 @@ async function loginAdmin(req, res) {
 }
 
 
-export { registerUser, loginUser, getUser, updateUser, deleteUser  , createAdmin};
+export { registerUser, loginUser, getUser, updateUser, deleteUser  , createAdmin , loginAdmin};
