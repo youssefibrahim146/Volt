@@ -62,18 +62,28 @@ async function getSystemDeviceById(req, res) {
 
 async function createSystemDevice(req, res) {
     try {
-        const { id, name, img, VoltagesAvailable, deviceWorkAllDay } = req.body;
+        const { name, img, VoltagesAvailable, deviceWorkAllDay } = req.body;
         
-        if (!id || !name || !img || !VoltagesAvailable) {
-            return formatResponse(res, 400, "Missing required fields", null, false);
+        const missingFields = [];
+        if (!name) missingFields.push('name');
+        if (!img) missingFields.push('img');
+        if (!VoltagesAvailable) missingFields.push('VoltagesAvailable');
+        
+        if (missingFields.length > 0) {
+            return formatResponse(
+                res, 
+                400, 
+                `Missing required fields: ${missingFields.join(', ')}`, 
+                null, 
+                false
+            );
         }
         
         const existingDevice = await prisma.systemDevice.findUnique({
-            where: { id: parseInt(id) }
+            where: { name }
         });
-        
         if (existingDevice) {
-            return formatResponse(res, 409, "Device with this ID already exists", null, false);
+            return formatResponse(res, 400, "System device already exists", null, false);
         }
         
         const newDevice = await prisma.systemDevice.create({
