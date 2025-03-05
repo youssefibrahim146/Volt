@@ -79,7 +79,8 @@ async function createSystemDevice(req, res) {
             );
         }
         
-        const existingDevice = await prisma.systemDevice.findUnique({
+        // Using findFirst instead of findUnique since name is not a unique field in the schema
+        const existingDevice = await prisma.systemDevice.findFirst({
             where: { name }
         });
         if (existingDevice) {
@@ -88,7 +89,6 @@ async function createSystemDevice(req, res) {
         
         const newDevice = await prisma.systemDevice.create({
             data: {
-                id: parseInt(id),
                 name,
                 img,
                 VoltagesAvailable: Array.isArray(VoltagesAvailable) ? VoltagesAvailable : [VoltagesAvailable],
