@@ -110,11 +110,9 @@ async function createSystemDevice(req, res) {
         
         const missingFields = [];
         if (!name) missingFields.push('name');
-        if (!req.file) missingFields.push('image file');
         if (!VoltagesAvailable) missingFields.push('VoltagesAvailable');
         
         if (missingFields.length > 0) {
-            // If there's an uploaded file but other fields are missing, delete the file
             if (req.file) {
                 fs.unlinkSync(req.file.path);
             }
@@ -127,7 +125,6 @@ async function createSystemDevice(req, res) {
             );
         }
         
-        // Using findFirst instead of findUnique since name is not a unique field in the schema
         const existingDevice = await prisma.systemDevice.findFirst({
             where: { name }
         });
@@ -138,14 +135,30 @@ async function createSystemDevice(req, res) {
             return formatResponse(res, 400, "System device already exists", null, false);
         }
         
-        // Generate the image URL
-        const imgPath = `/uploads/images/${path.basename(req.file.path)}`;
+        let imgPath = null;
+        if (req.file) {
+            imgPath = `/uploads/images/${path.basename(req.file.path)}`;
+        }
+        
+        let voltagesArray = [];
+        try {
+            if (Array.isArray(VoltagesAvailable)) {
+                voltagesArray = VoltagesAvailable.map(v => parseInt(v)).filter(v => !isNaN(v));
+            } else if (VoltagesAvailable) {
+                const parsed = parseInt(VoltagesAvailable);
+                if (!isNaN(parsed)) {
+                    voltagesArray = [parsed];
+                }
+            }
+        } catch (error) {
+            console.error("Error parsing VoltagesAvailable:", error);
+        }
         
         const newDevice = await prisma.systemDevice.create({
             data: {
                 name,
                 img: imgPath,
-                VoltagesAvailable: Array.isArray(VoltagesAvailable) ? VoltagesAvailable : [parseInt(VoltagesAvailable)],
+                VoltagesAvailable: voltagesArray,
                 deviceWorkAllDay: deviceWorkAllDay === true || deviceWorkAllDay === "true"
             }
         });
@@ -153,7 +166,6 @@ async function createSystemDevice(req, res) {
         return formatResponse(res, 201, "System device created successfully", newDevice);
     } catch (error) {
         console.error("Error creating system device:", error);
-        // If an error occurred and a file was uploaded, delete it
         if (req.file) {
             fs.unlinkSync(req.file.path);
         }
