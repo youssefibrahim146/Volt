@@ -33,8 +33,8 @@ router.post("/admin/login", loginAdmin);
 
 router.get("/system-devices", getSystemDevices);
 router.get("/system-devices/:id", getSystemDeviceById);
-router.post("/system-devices", isAuthenticated, isAdmin, upload.single('image'), createSystemDevice);
-router.put("/system-devices/:id", isAuthenticated, isAdmin, upload.single('image'), updateSystemDevice);
+router.post("/system-devices", isAuthenticated, isAdmin, upload.single('img'), createSystemDevice);
+router.put("/system-devices/:id", isAuthenticated, isAdmin, upload.single('img'), updateSystemDevice);
 router.delete("/system-devices/:id", isAuthenticated, isAdmin, deleteSystemDevice);
 
 
