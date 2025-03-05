@@ -7,7 +7,8 @@ import {
     getSystemDeviceById,
     createSystemDevice,
     updateSystemDevice,
-    deleteSystemDevice
+    deleteSystemDevice,
+    upload
 } from "../controllers/systemDevicesController.js";
 const router = Router();
 
@@ -32,9 +33,9 @@ router.post("/admin/login", loginAdmin);
 
 router.get("/system-devices", getSystemDevices);
 router.get("/system-devices/:id", getSystemDeviceById);
-router.post("/system-devices" , isAdmin, createSystemDevice);
-router.put("/system-devices/:id" , isAdmin, updateSystemDevice);
-router.delete("/system-devices/:id" , isAdmin, deleteSystemDevice);
+router.post("/system-devices", isAuthenticated, isAdmin, upload.single('image'), createSystemDevice);
+router.put("/system-devices/:id", isAuthenticated, isAdmin, upload.single('image'), updateSystemDevice);
+router.delete("/system-devices/:id", isAuthenticated, isAdmin, deleteSystemDevice);
 
 
 export default router;
