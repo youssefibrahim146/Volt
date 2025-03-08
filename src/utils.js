@@ -48,10 +48,22 @@ export const getPaginationParams = (query) => {
     const page = parseInt(query.page) || 1;
     const limit = parseInt(query.limit) || 10;
     const skip = (page - 1) * limit;
-    
+
     return {
         page,
         limit,
         skip
     };
+}
+/**
+ * Calculates the cost of running a device based on its power consumption, usage time, and cost per kilowatt-hour.
+ *
+ * @param {number} watts - The power consumption of the device in watts.
+ * @param {number} hours - The number of hours the device is used.
+ * @param {number} [costPerKWh=0.68] - The cost per kilowatt-hour. Default is 0.68.
+ * @returns {number} The total cost of running the device.
+ */
+export const calculateDeviceCost = (watts, hours, costPerKWh = 0.68) => {
+    const kWh = (watts * hours) / 1000;
+    return kWh * costPerKWh;
 }
