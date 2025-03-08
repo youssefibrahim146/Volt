@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { formatResponse, getPaginationParams } from "../utils.js";
 const prisma = new PrismaClient();
-
+import { calculateDeviceCost } from "../utils.js";
 async function addHomeDeviceToUser(req, res) {
     const { homeDeviceId } = req.params;
     const { userId } = req.user;
@@ -33,7 +33,7 @@ async function addHomeDeviceToUser(req, res) {
                     },
                     data: {
                         minBudget: {
-                            // increment: systemDevice.wattsOptions[0]
+                            increment: calculateDeviceCost(chosenWatts, 24)
                         }
                     }
                 });
