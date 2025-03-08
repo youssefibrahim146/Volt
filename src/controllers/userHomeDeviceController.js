@@ -13,14 +13,14 @@ async function addHomeDeviceToUser(req, res) {
         if (!systemDevice) {
             return res.status(404).json(formatResponse("Device not found"));
         }
-        if (!systemDevice.VoltagesAvailable.includes(chosenVoltage)) {
-            return res.status(400).json(formatResponse("Invalid voltage choice"));
+        if (!systemDevice.wattsOptions.includes(chosenWatts)) {
+            return res.status(400).json(formatResponse("Invalid wattage choice"));
         }
         const userHomeDevice = await prisma.userHomeDevice.create({
             data: {
                 userId,
                 systemDeviceId: systemDevice.id,
-                chosenVoltage
+                chosenWatts
             },
         });
         if (!userHomeDevice) {
