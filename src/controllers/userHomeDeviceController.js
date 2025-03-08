@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { formatResponse, getPaginationParams } from "../utils.js";
 const prisma = new PrismaClient();
-
-async function addHomeDeviceToUser(req,res) {
+import { calculateDeviceCost } from "../utils.js";
+async function addHomeDeviceToUser(req, res) {
     const { homeDeviceId } = req.params;
     const { userId } = req.user;
-    const { chosenWatts } = req.body;  
+    const { chosenWatts } = req.body;
     try {
         const systemDevice = await prisma.systemDevice.findUnique({
             where: { id: Number(homeDeviceId) },
@@ -23,8 +23,26 @@ async function addHomeDeviceToUser(req,res) {
                 chosenWatts
             },
         });
-        return res.status(200)
-                  .json(formatResponse("Home device added to user", userHomeDevice));
+        if (!userHomeDevice) {
+            return res.status(400).json(formatResponse("Failed to add device to user"));
+        } else {
+            if(systemDevice.deviceWorkAllDay === true){{
+                const updateUserMinBudget = await prisma.user.update({
+                    where: {
+                        id: userId,
+                    },
+                    data: {
+                        minBudget: {
+                            increment: calculateDeviceCost(chosenWatts, 24)
+                        }
+                    }
+                });
+            }
+
+            }
+            return res.status(200)
+                .json(formatResponse("Home device added to user", userHomeDevice));
+        }
     }
     catch (error) {
         console.error(error);
