@@ -10,6 +10,16 @@ import {
     deleteSystemDevice,
     upload
 } from "../controllers/systemDevicesController.js";
+import {
+    addHomeDeviceToUser,
+    getUserHomeDevices,
+    getUserHomeDeviceById,
+    updateUserHomeDevice,
+    deleteUserHomeDevice,
+    calculateUserDevicesCost,
+    getRecommendedDevices
+} from "../controllers/userHomeDeviceController.js";
+
 const router = Router();
 
 router.post("/register", registerUser);
@@ -37,5 +47,12 @@ router.post("/system-devices", isAuthenticated, isAdmin, upload.single('img'), c
 router.put("/system-devices/:id", isAuthenticated, isAdmin, upload.single('img'), updateSystemDevice);
 router.delete("/system-devices/:id", isAuthenticated, isAdmin, deleteSystemDevice);
 
+router.post("/home-devices/:homeDeviceId", isAuthenticated, addHomeDeviceToUser);
+router.get("/home-devices", isAuthenticated, getUserHomeDevices);
+router.get("/home-devices/:id", isAuthenticated, getUserHomeDeviceById);
+router.put("/home-devices/:id", isAuthenticated, updateUserHomeDevice);
+router.delete("/home-devices/:id", isAuthenticated, deleteUserHomeDevice);
+router.get("/home-devices/calculate-cost", isAuthenticated, calculateUserDevicesCost);
+router.get("/home-devices/recommendations", isAuthenticated, getRecommendedDevices);
 
 export default router;
