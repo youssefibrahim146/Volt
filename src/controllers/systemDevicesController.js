@@ -106,11 +106,11 @@ async function getSystemDeviceById(req, res) {
 
 async function createSystemDevice(req, res) {
     try {
-        const { name, VoltagesAvailable, deviceWorkAllDay } = req.body;
+        const { name, wattsOptions, deviceWorkAllDay } = req.body;
         
         const missingFields = [];
         if (!name) missingFields.push('name');
-        if (!VoltagesAvailable) missingFields.push('VoltagesAvailable');
+        if (!wattsOptions) missingFields.push('wattsOptions');
         
         if (missingFields.length > 0) {
             if (req.file) {
@@ -140,25 +140,25 @@ async function createSystemDevice(req, res) {
             imgPath = `/uploads/images/${path.basename(req.file.path)}`;
         }
         
-        let voltagesArray = [];
+        let wattsArray = [];
         try {
-            if (Array.isArray(VoltagesAvailable)) {
-                voltagesArray = VoltagesAvailable.map(v => parseInt(v)).filter(v => !isNaN(v));
-            } else if (VoltagesAvailable) {
-                const parsed = parseInt(VoltagesAvailable);
+            if (Array.isArray(wattsOptions)) {
+                wattsArray = wattsOptions.map(w => parseInt(w)).filter(w => !isNaN(w));
+            } else if (wattsOptions) {
+                const parsed = parseInt(wattsOptions);
                 if (!isNaN(parsed)) {
-                    voltagesArray = [parsed];
+                    wattsArray = [parsed];
                 }
             }
         } catch (error) {
-            console.error("Error parsing VoltagesAvailable:", error);
+            console.error("Error parsing wattsOptions:", error);
         }
         
         const newDevice = await prisma.systemDevice.create({
             data: {
                 name,
                 img: imgPath,
-                VoltagesAvailable: voltagesArray,
+                wattsOptions: wattsArray,
                 deviceWorkAllDay: deviceWorkAllDay === true || deviceWorkAllDay === "true"
             }
         });
@@ -176,7 +176,7 @@ async function createSystemDevice(req, res) {
 async function updateSystemDevice(req, res) {
     try {
         const { id } = req.params;
-        const { name, VoltagesAvailable, deviceWorkAllDay } = req.body;
+        const { name, wattsOptions, deviceWorkAllDay } = req.body;
         
         const existingDevice = await prisma.systemDevice.findUnique({
             where: { id: parseInt(id) }
@@ -192,10 +192,10 @@ async function updateSystemDevice(req, res) {
         // Prepare the update data
         const updateData = {
             ...(name && { name }),
-            ...(VoltagesAvailable && { 
-                VoltagesAvailable: Array.isArray(VoltagesAvailable) 
-                    ? VoltagesAvailable.map(v => parseInt(v))
-                    : [parseInt(VoltagesAvailable)] 
+            ...(wattsOptions && { 
+                wattsOptions: Array.isArray(wattsOptions) 
+                    ? wattsOptions.map(w => parseInt(w))
+                    : [parseInt(wattsOptions)] 
             }),
             ...(deviceWorkAllDay !== undefined && { 
                 deviceWorkAllDay: deviceWorkAllDay === true || deviceWorkAllDay === "true" 

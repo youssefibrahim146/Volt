@@ -13,7 +13,7 @@ model User {
   userName  String
   password String
   budget Int
-  totalVoltage Int
+  totalWattage Int
   minBudget Int
 
   userHomeDevices userHomeDevice[]
@@ -29,7 +29,7 @@ model systemDevice {
   id    Int     @id @default(autoincrement())
   name String
   img String
-  VoltagesAvailable   Int[]
+  wattsOptions   Int[]
   deviceWorkAllDay   Boolean
 
   userHomeDevices userHomeDevice[]
@@ -40,7 +40,7 @@ model userHomeDevice {
   userInputWorkTime Int
   userId  Int
   systemDeviceId Int
-  chosenVoltage    Int?
+  chosenWatts    Int?
   user User @relation(fields: [userId], references: [id])
   systemDevice systemDevice @relation(fields: [systemDeviceId], references: [id])
 }
