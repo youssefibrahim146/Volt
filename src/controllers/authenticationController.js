@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
  */
 async function registerUser(req, res) {
     try {
-        const { userName, email, password, budget = 0, totalVoltage = 0, minBudget = 0 } = req.body;
+        const { userName, email, password, budget = 0, totalWattage = 0, minBudget = 0 } = req.body;
         console.log("registerUser");
         console.log(req.body);
         
@@ -25,7 +25,7 @@ async function registerUser(req, res) {
                 email,
                 password: hashedPassword,
                 budget,
-                totalVoltage,
+                totalWattage,
                 minBudget
             },
         });
@@ -105,14 +105,14 @@ async function getUser(req, res) {
  */
 async function updateUser(req, res) {
     try {
-        const { userName, email, password, budget, totalVoltage, minBudget } = req.body;
+        const { userName, email, password, budget, totalWattage, minBudget } = req.body;
         
         const updateData = {
             ...(userName && { userName }),
             ...(email && { email }),
             ...(password && { password: await hashPassword(password) }),
             ...(budget !== undefined && { budget }),
-            ...(totalVoltage !== undefined && { totalVoltage }),
+            ...(totalWattage !== undefined && { totalWattage }),
             ...(minBudget !== undefined && { minBudget })
         };
         
