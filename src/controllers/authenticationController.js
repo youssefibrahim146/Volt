@@ -204,4 +204,30 @@ async function loginAdmin(req, res) {
     }
 }
 
-export { registerUser, loginUser, getUser, updateUser, deleteUser, createAdmin, loginAdmin };
+/**
+ * Updates only the budget of the authenticated user.
+ * @param {object} req Express request object.
+ * @param {object} res Express response object.
+ */
+async function updateUserBudget(req, res) {
+    try {
+        const { budget } = req.body;
+        
+        if (budget === undefined) {
+            return formatResponse(res, 400, "Budget is required", null, false);
+        }
+        
+        const user = await prisma.user.update({
+            where: {
+                id: req.user.id,
+            },
+            data: { budget }
+        });
+        
+        return formatResponse(res, 200, "Budget updated successfully", user);
+    } catch (error) {
+        return formatResponse(res, 500, "Internal Server Error", null, false);
+    }
+}
+
+export { registerUser, loginUser, getUser, updateUser, deleteUser, createAdmin, loginAdmin, updateUserBudget };

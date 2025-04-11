@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { registerUser, loginUser, getUser, updateUser, deleteUser, createAdmin, loginAdmin } from "../controllers/authenticationController.js";
+import { registerUser, loginUser, getUser, updateUser, deleteUser, createAdmin, loginAdmin, updateUserBudget } from "../controllers/authenticationController.js";
 import isAuthenticated from "../middlewares/isAuthenticated.js";
 import isAdmin from "../middlewares/isAdmin.js";
 import errorHandler from "../middlewares/errorHandler.js";
@@ -33,6 +33,7 @@ router.put("/user",
 router.delete("/user",
     isAuthenticated,
     deleteUser);
+router.put("/users/budget", isAuthenticated, updateUserBudget);
 
 router.get("/admin", isAuthenticated, isAdmin, (req, res) => {
     res.status(200).json({ message: "Welcome Admin" });
