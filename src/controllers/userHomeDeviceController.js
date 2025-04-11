@@ -1,60 +1,75 @@
 import { PrismaClient } from "@prisma/client";
-import { formatResponse, getPaginationParams } from "../utils.js";
+import { formatResponse, getPaginationParams, calculateDeviceCost, safeParseNumber, safeTransaction, validateRequiredParams } from "../utils.js";
 const prisma = new PrismaClient();
-import { calculateDeviceCost } from "../utils.js";
 
 /**
  * Add a home device to a user
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function addHomeDeviceToUser(req, res) {
-    const { homeDeviceId } = req.params;
-    const userId = req.user.id;
-    const { chosenWatts, userInputWorkTime } = req.body;
-    
+async function addHomeDeviceToUser(req, res, next) {
     try {
+        const { homeDeviceId } = req.params;
+        const userId = req.user.id;
+        const { chosenWatts, userInputWorkTime } = req.body;
+        
+        // Validate required parameters
+        validateRequiredParams({ homeDeviceId, chosenWatts }, ['homeDeviceId', 'chosenWatts']);
+        
+        const deviceId = safeParseNumber(homeDeviceId);
+        const watts = safeParseNumber(chosenWatts);
+        
+        if (deviceId <= 0 || watts <= 0) {
+            const error = new Error("Invalid homeDeviceId or chosenWatts");
+            error.statusCode = 400;
+            throw error;
+        }
+        
         const systemDevice = await prisma.systemDevice.findUnique({
-            where: { id: Number(homeDeviceId) },
+            where: { id: deviceId },
         });
         
         if (!systemDevice) {
-            return formatResponse(res, 404, "Device not found", null, false);
+            const error = new Error("Device not found");
+            error.statusCode = 404;
+            throw error;
         }
         
-        if (!systemDevice.wattsOptions.includes(Number(chosenWatts))) {
-            return formatResponse(res, 400, "Invalid wattage choice", null, false);
+        if (!systemDevice.wattsOptions.includes(watts)) {
+            const error = new Error("Invalid wattage choice");
+            error.statusCode = 400;
+            throw error;
         }
         
-        const actualWorkTime = systemDevice.deviceWorkAllDay ? 24 : userInputWorkTime || 0;
+        const actualWorkTime = systemDevice.deviceWorkAllDay ? 24 : safeParseNumber(userInputWorkTime, 0);
         
-        const userHomeDevice = await prisma.userHomeDevice.create({
-            data: {
-                userId,
-                systemDeviceId: Number(homeDeviceId),
-                chosenWatts: Number(chosenWatts),
-                userInputWorkTime: actualWorkTime
-            },
-        });
-        
-        if (!userHomeDevice) {
-            return formatResponse(res, 400, "Failed to add device to user", null, false);
-        }
-        
-        if (systemDevice.deviceWorkAllDay) {
-            await prisma.user.update({
-                where: { id: userId },
+        const result = await safeTransaction(async () => {
+            const userHomeDevice = await prisma.userHomeDevice.create({
                 data: {
-                    minBudget: { increment: calculateDeviceCost(chosenWatts, 24) },
-                    totalWattage: { increment: Number(chosenWatts) }
-                }
+                    userId,
+                    systemDeviceId: deviceId,
+                    chosenWatts: watts,
+                    userInputWorkTime: actualWorkTime
+                },
             });
-        }
+            
+            if (systemDevice.deviceWorkAllDay) {
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        minBudget: { increment: calculateDeviceCost(watts, 24) },
+                        totalWattage: { increment: watts }
+                    }
+                });
+            }
+            
+            return userHomeDevice;
+        }, prisma);
         
-        return formatResponse(res, 201, "Home device added to user", userHomeDevice);
+        return formatResponse(res, 201, "Home device added to user", result);
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -62,8 +77,9 @@ async function addHomeDeviceToUser(req, res) {
  * Get all home devices for a user
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function getUserHomeDevices(req, res) {
+async function getUserHomeDevices(req, res, next) {
     try {
         const userId = req.user.id;
         const { page, limit, skip } = getPaginationParams(req.query);
@@ -95,8 +111,7 @@ async function getUserHomeDevices(req, res) {
             }
         });
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -104,15 +119,23 @@ async function getUserHomeDevices(req, res) {
  * Get a specific user home device by ID
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function getUserHomeDeviceById(req, res) {
+async function getUserHomeDeviceById(req, res, next) {
     try {
         const userId = req.user.id;
         const { id } = req.params;
+        const deviceId = safeParseNumber(id);
         
-        const device = await prisma.userHomeDevice.findUnique({
+        if (deviceId <= 0) {
+            const error = new Error("Invalid device ID");
+            error.statusCode = 400;
+            throw error;
+        }
+        
+        const device = await prisma.userHomeDevice.findFirst({
             where: { 
-                id: Number(id),
+                id: deviceId,
                 userId
             },
             include: {
@@ -121,13 +144,14 @@ async function getUserHomeDeviceById(req, res) {
         });
         
         if (!device) {
-            return formatResponse(res, 404, "Device not found", null, false);
+            const error = new Error("Device not found");
+            error.statusCode = 404;
+            throw error;
         }
         
         return formatResponse(res, 200, "User home device retrieved successfully", device);
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -135,17 +159,25 @@ async function getUserHomeDeviceById(req, res) {
  * Update a user home device
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function updateUserHomeDevice(req, res) {
+async function updateUserHomeDevice(req, res, next) {
     try {
         const userId = req.user.id;
         const { id } = req.params;
         const { chosenWatts, userInputWorkTime } = req.body;
+        const deviceId = safeParseNumber(id);
+        
+        if (deviceId <= 0) {
+            const error = new Error("Invalid device ID");
+            error.statusCode = 400;
+            throw error;
+        }
         
         // First check if the device exists and belongs to the user
         const existingDevice = await prisma.userHomeDevice.findFirst({
             where: {
-                id: Number(id),
+                id: deviceId,
                 userId
             },
             include: {
@@ -154,54 +186,63 @@ async function updateUserHomeDevice(req, res) {
         });
         
         if (!existingDevice) {
-            return formatResponse(res, 404, "Device not found", null, false);
+            const error = new Error("Device not found");
+            error.statusCode = 404;
+            throw error;
         }
         
-        if (chosenWatts && !existingDevice.systemDevice.wattsOptions.includes(Number(chosenWatts))) {
-            return formatResponse(res, 400, "Invalid wattage choice", null, false);
+        const watts = chosenWatts !== undefined ? safeParseNumber(chosenWatts) : undefined;
+        
+        if (watts !== undefined && !existingDevice.systemDevice.wattsOptions.includes(watts)) {
+            const error = new Error("Invalid wattage choice");
+            error.statusCode = 400;
+            throw error;
         }
         
         const updateData = {};
         
-        if (chosenWatts !== undefined) {
-            updateData.chosenWatts = Number(chosenWatts);
+        if (watts !== undefined) {
+            updateData.chosenWatts = watts;
         }
         
         // Only allow updating work time if the device doesn't work all day
         if (!existingDevice.systemDevice.deviceWorkAllDay && userInputWorkTime !== undefined) {
-            updateData.userInputWorkTime = Number(userInputWorkTime);
+            updateData.userInputWorkTime = safeParseNumber(userInputWorkTime);
         }
         
-        // Update the device
-        const updatedDevice = await prisma.userHomeDevice.update({
-            where: { id: Number(id) },
-            data: updateData,
-            include: {
-                systemDevice: true
-            }
-        });
-        
-        if (existingDevice.systemDevice.deviceWorkAllDay && 
-            chosenWatts && 
-            existingDevice.chosenWatts !== Number(chosenWatts)) {
-            
-            const wattsDifference = Number(chosenWatts) - existingDevice.chosenWatts;
-            const costDifference = calculateDeviceCost(chosenWatts, 24) - 
-                                  calculateDeviceCost(existingDevice.chosenWatts, 24);
-            
-            await prisma.user.update({
-                where: { id: userId },
-                data: {
-                    minBudget: { increment: costDifference },
-                    totalWattage: { increment: wattsDifference }
+        // Use transaction to ensure data consistency
+        const result = await safeTransaction(async () => {
+            const updatedDevice = await prisma.userHomeDevice.update({
+                where: { id: deviceId },
+                data: updateData,
+                include: {
+                    systemDevice: true
                 }
             });
-        }
+            
+            if (existingDevice.systemDevice.deviceWorkAllDay && 
+                watts !== undefined && 
+                existingDevice.chosenWatts !== watts) {
+                
+                const wattsDifference = watts - existingDevice.chosenWatts;
+                const costDifference = calculateDeviceCost(watts, 24) - 
+                                      calculateDeviceCost(existingDevice.chosenWatts, 24);
+                
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        minBudget: { increment: costDifference },
+                        totalWattage: { increment: wattsDifference }
+                    }
+                });
+            }
+            
+            return updatedDevice;
+        }, prisma);
         
-        return formatResponse(res, 200, "User home device updated successfully", updatedDevice);
+        return formatResponse(res, 200, "User home device updated successfully", result);
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -209,15 +250,23 @@ async function updateUserHomeDevice(req, res) {
  * Delete a user home device
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function deleteUserHomeDevice(req, res) {
+async function deleteUserHomeDevice(req, res, next) {
     try {
         const userId = req.user.id;
         const { id } = req.params;
+        const deviceId = safeParseNumber(id);
+        
+        if (deviceId <= 0) {
+            const error = new Error("Invalid device ID");
+            error.statusCode = 400;
+            throw error;
+        }
         
         const existingDevice = await prisma.userHomeDevice.findFirst({
             where: {
-                id: Number(id),
+                id: deviceId,
                 userId
             },
             include: {
@@ -226,32 +275,36 @@ async function deleteUserHomeDevice(req, res) {
         });
         
         if (!existingDevice) {
-            return formatResponse(res, 404, "Device not found", null, false);
+            const error = new Error("Device not found");
+            error.statusCode = 404;
+            throw error;
         }
         
-        await prisma.userHomeDevice.delete({
-            where: { id: Number(id) }
-        });
-        
-        // If it was an all-day device, update user's total wattage and min budget
-        if (existingDevice.systemDevice.deviceWorkAllDay && existingDevice.chosenWatts) {
-            await prisma.user.update({
-                where: { id: userId },
-                data: {
-                    minBudget: { 
-                        decrement: calculateDeviceCost(existingDevice.chosenWatts, 24) 
-                    },
-                    totalWattage: { 
-                        decrement: existingDevice.chosenWatts 
-                    }
-                }
+        // Use transaction to ensure data consistency
+        await safeTransaction(async () => {
+            await prisma.userHomeDevice.delete({
+                where: { id: deviceId }
             });
-        }
+            
+            // If it was an all-day device, update user's total wattage and min budget
+            if (existingDevice.systemDevice.deviceWorkAllDay && existingDevice.chosenWatts) {
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: {
+                        minBudget: { 
+                            decrement: calculateDeviceCost(existingDevice.chosenWatts, 24) 
+                        },
+                        totalWattage: { 
+                            decrement: existingDevice.chosenWatts 
+                        }
+                    }
+                });
+            }
+        }, prisma);
         
         return formatResponse(res, 200, "User home device deleted successfully");
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -259,11 +312,12 @@ async function deleteUserHomeDevice(req, res) {
  * Calculate estimated costs for a user's devices
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function calculateUserDevicesCost(req, res) {
+async function calculateUserDevicesCost(req, res, next) {
     try {
         const userId = req.user.id;
-        const { costPerKWh = 0.68 } = req.query;
+        const costPerKWh = safeParseNumber(req.query.costPerKWh, 0.68);
         
         const userDevices = await prisma.userHomeDevice.findMany({
             where: { userId },
@@ -277,7 +331,7 @@ async function calculateUserDevicesCost(req, res) {
         const devicesCost = userDevices.map(device => {
             const watts = device.chosenWatts || 0;
             const hours = device.systemDevice.deviceWorkAllDay ? 24 : device.userInputWorkTime || 0;
-            const cost = calculateDeviceCost(watts, hours, Number(costPerKWh));
+            const cost = calculateDeviceCost(watts, hours, costPerKWh);
             
             totalCost += cost;
             totalWattage += watts;
@@ -301,8 +355,7 @@ async function calculateUserDevicesCost(req, res) {
             }
         });
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
     }
 }
 
@@ -310,8 +363,9 @@ async function calculateUserDevicesCost(req, res) {
  * Get recommended devices for a user based on their budget
  * @param {object} req - Express request object
  * @param {object} res - Express response object
+ * @param {function} next - Express next function
  */
-async function getRecommendedDevices(req, res) {
+async function getRecommendedDevices(req, res, next) {
     try {
         const userId = req.user.id;
         
@@ -320,13 +374,15 @@ async function getRecommendedDevices(req, res) {
         });
         
         if (!user) {
-            return formatResponse(res, 404, "User not found", null, false);
+            const error = new Error("User not found");
+            error.statusCode = 404;
+            throw error;
         }
         
         const allDevices = await prisma.systemDevice.findMany();
         
         // Filter devices that fit within remaining budget
-        const remainingBudget = user.budget - user.minBudget;
+        const remainingBudget = safeParseNumber(user.budget, 0) - safeParseNumber(user.minBudget, 0);
         const recommendedDevices = allDevices.filter(device => {
             // Find the lowest wattage option that fits the budget
             const affordableWattOptions = device.wattsOptions.filter(watts => {
@@ -346,8 +402,76 @@ async function getRecommendedDevices(req, res) {
             }
         });
     } catch (error) {
-        console.error(error);
-        return formatResponse(res, 500, "Internal server error", null, false);
+        next(error);
+    }
+}
+
+/**
+ * Search user home devices by device name and other filters
+ * @param {object} req - Express request object
+ * @param {object} res - Express response object
+ * @param {function} next - Express next function
+ */
+async function searchUserHomeDevices(req, res, next) {
+    try {
+        const userId = req.user.id;
+        const { page, limit, skip } = getPaginationParams(req.query);
+        const { deviceName, minWatts, maxWatts } = req.query;
+        
+        // Build filter conditions
+        let whereCondition = { userId };
+        
+        // Create a complex query to filter based on system device properties
+        if (deviceName) {
+            whereCondition.systemDevice = {
+                name: {
+                    contains: deviceName,
+                    mode: 'insensitive'
+                }
+            };
+        }
+        
+        // First get all user's devices to filter by watts
+        let userDevices = await prisma.userHomeDevice.findMany({
+            where: whereCondition,
+            include: {
+                systemDevice: true
+            }
+        });
+        
+        // Filter by watts range if specified
+        if (minWatts || maxWatts) {
+            userDevices = userDevices.filter(device => {
+                const watts = device.chosenWatts;
+                if (minWatts && maxWatts) {
+                    return watts >= parseInt(minWatts) && watts <= parseInt(maxWatts);
+                } else if (minWatts) {
+                    return watts >= parseInt(minWatts);
+                } else if (maxWatts) {
+                    return watts <= parseInt(maxWatts);
+                }
+                return true;
+            });
+        }
+        
+        // Apply pagination manually
+        const totalCount = userDevices.length;
+        const totalPages = Math.ceil(totalCount / limit);
+        const paginatedDevices = userDevices.slice(skip, skip + limit);
+        
+        return formatResponse(res, 200, "Search results retrieved successfully", {
+            devices: paginatedDevices,
+            pagination: {
+                page,
+                limit,
+                totalCount,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
+        });
+    } catch (error) {
+        next(error);
     }
 }
 
@@ -358,5 +482,6 @@ export {
     updateUserHomeDevice,
     deleteUserHomeDevice,
     calculateUserDevicesCost,
-    getRecommendedDevices
+    getRecommendedDevices,
+    searchUserHomeDevices
 };

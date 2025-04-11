@@ -55,6 +55,7 @@ export const getPaginationParams = (query) => {
         skip
     };
 }
+
 /**
  * Calculates the cost of running a device based on its power consumption, usage time, and cost per kilowatt-hour.
  *
@@ -66,4 +67,50 @@ export const getPaginationParams = (query) => {
 export const calculateDeviceCost = (watts, hours, costPerKWh = 0.68) => {
     const kWh = (watts * hours) / 1000;
     return kWh * costPerKWh;
+}
+
+/**
+ * Safely parse a number from input, returning default value if parsing fails
+ * @param {any} value - Value to parse
+ * @param {number} defaultValue - Default value if parsing fails
+ * @returns {number} Parsed number or default value
+ */
+export const safeParseNumber = (value, defaultValue = 0) => {
+    if (value === null || value === undefined) return defaultValue;
+    const parsed = Number(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+}
+
+/**
+ * Safely execute a database transaction with proper error handling
+ * @param {Function} fn - Async function to execute within transaction
+ * @param {PrismaClient} prisma - Prisma client instance
+ * @returns {Promise<any>} Result of the transaction
+ */
+export const safeTransaction = async (fn, prisma) => {
+    try {
+        return await prisma.$transaction(fn);
+    } catch (error) {
+        console.error('Transaction error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Validate that required parameters are present
+ * @param {Object} params - Parameters to validate
+ * @param {Array<string>} required - Required parameter names
+ * @throws {Error} If any required parameter is missing
+ */
+export const validateRequiredParams = (params, required) => {
+    const missing = required.filter(param => 
+        params[param] === undefined || params[param] === null || params[param] === ''
+    );
+    
+    if (missing.length > 0) {
+        const error = new Error(`Missing required parameters: ${missing.join(', ')}`);
+        error.statusCode = 400;
+        error.name = 'ValidationError';
+        throw error;
+    }
 }

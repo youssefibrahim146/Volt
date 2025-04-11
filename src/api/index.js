@@ -2,6 +2,7 @@ import { Router } from "express";
 import { registerUser, loginUser, getUser, updateUser, deleteUser, createAdmin, loginAdmin } from "../controllers/authenticationController.js";
 import isAuthenticated from "../middlewares/isAuthenticated.js";
 import isAdmin from "../middlewares/isAdmin.js";
+import errorHandler from "../middlewares/errorHandler.js";
 import {
     getSystemDevices,
     getSystemDeviceById,
@@ -54,5 +55,7 @@ router.put("/home-devices/:id", isAuthenticated, updateUserHomeDevice);
 router.delete("/home-devices/:id", isAuthenticated, deleteUserHomeDevice);
 router.get("/home-devices/calculate-cost", isAuthenticated, calculateUserDevicesCost);
 router.get("/home-devices/recommendations", isAuthenticated, getRecommendedDevices);
+
+router.use(errorHandler);
 
 export default router;
