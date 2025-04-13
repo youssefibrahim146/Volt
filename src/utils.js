@@ -61,10 +61,10 @@ export const getPaginationParams = (query) => {
  *
  * @param {number} watts - The power consumption of the device in watts.
  * @param {number} hours - The number of hours the device is used.
- * @param {number} [costPerKWh=0.68] - The cost per kilowatt-hour. Default is 0.68.
+ * @param {number} [costPerKWh=0.068] - The cost per kilowatt-hour. Default is 0.068.
  * @returns {number} The total cost of running the device.
  */
-export const calculateDeviceCost = (watts, hours, costPerKWh = 0.68) => {
+export const calculateDeviceCost = (watts, hours, costPerKWh = 0.068) => {
     const kWh = (watts * hours) / 1000;
     return kWh * costPerKWh;
 }

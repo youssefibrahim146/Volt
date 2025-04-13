@@ -317,7 +317,7 @@ async function deleteUserHomeDevice(req, res, next) {
 async function calculateUserDevicesCost(req, res, next) {
     try {
         const userId = req.user.id;
-        const costPerKWh = safeParseNumber(req.query.costPerKWh, 0.68);
+        const costPerKWh = safeParseNumber(req.query.costPerKWh, 0.068);
         
         const userDevices = await prisma.userHomeDevice.findMany({
             where: { userId },
