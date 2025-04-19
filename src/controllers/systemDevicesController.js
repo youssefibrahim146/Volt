@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { formatResponse, getPaginationParams } from "../utils.js";
+import { formatResponse, getPaginationParams, safeTransaction } from "../utils.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -86,23 +86,27 @@ async function getSystemDevices(req, res) {
     try {
         const { page, limit, skip } = getPaginationParams(req.query);
         
-        const [devices, totalCount] = await Promise.all([
-            prisma.systemDevice.findMany({
-                skip,
-                take: limit,
-                orderBy: { id: 'desc' }
-            }),
-            prisma.systemDevice.count()
-        ]);
+        const result = await safeTransaction(async (prisma) => {
+            const [devices, totalCount] = await Promise.all([
+                prisma.systemDevice.findMany({
+                    skip,
+                    take: limit,
+                    orderBy: { id: 'desc' }
+                }),
+                prisma.systemDevice.count()
+            ]);
+            
+            return { devices, totalCount };
+        }, prisma);
         
-        const totalPages = Math.ceil(totalCount / limit);
+        const totalPages = Math.ceil(result.totalCount / limit);
         
         return formatResponse(res, 200, "System devices retrieved successfully", {
-            devices,
+            devices: result.devices,
             pagination: {
                 page,
                 limit,
-                totalCount,
+                totalCount: result.totalCount,
                 totalPages,
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1
@@ -121,13 +125,15 @@ async function getSystemDeviceById(req, res) {
             return formatResponse(res, 400, "Invalid device ID", null, false);
         }
         
-        const device = await prisma.systemDevice.findUnique({
-            where: { id: parseInt(id) },
-            include: {
-                userHomeDevices: true,
-                userHomeDevice: true
-            }
-        });
+        const device = await safeTransaction(async (prisma) => {
+            return await prisma.systemDevice.findUnique({
+                where: { id: parseInt(id) },
+                include: {
+                    userHomeDevices: true,
+                    userHomeDevice: true
+                }
+            });
+        }, prisma);
         
         if (!device) {
             return formatResponse(res, 404, "System device not found", null, false);
@@ -161,36 +167,35 @@ async function createSystemDevice(req, res) {
             );
         }
         
-        // Check for duplicate device
-        const existingDevice = await prisma.systemDevice.findFirst({
-            where: { name }
-        });
-        
-        if (existingDevice) {
+        const newDevice = await safeTransaction(async (prisma) => {
+            // Check for duplicate device
+            const existingDevice = await prisma.systemDevice.findFirst({
+                where: { name }
+            });
+            
+            if (existingDevice) {
+                throw new Error("System device with this name already exists");
+            }
+            
+            // Process image if uploaded
+            let imgPath = null;
             if (req.file) {
-                cleanupFile(req.file.path);
+                imgPath = `/uploads/images/${path.basename(req.file.path)}`;
             }
-            return formatResponse(res, 400, "System device with this name already exists", null, false);
-        }
-        
-        // Process image if uploaded
-        let imgPath = null;
-        if (req.file) {
-            imgPath = `/uploads/images/${path.basename(req.file.path)}`;
-        }
-        
-        // Parse watts options
-        const wattsArray = parseWattsOptions(wattsOptions);
-        
-        // Create the device
-        const newDevice = await prisma.systemDevice.create({
-            data: {
-                name,
-                img: imgPath,
-                wattsOptions: wattsArray,
-                deviceWorkAllDay: getBooleanValue(deviceWorkAllDay)
-            }
-        });
+            
+            // Parse watts options
+            const wattsArray = parseWattsOptions(wattsOptions);
+            
+            // Create the device
+            return await prisma.systemDevice.create({
+                data: {
+                    name,
+                    img: imgPath,
+                    wattsOptions: wattsArray,
+                    deviceWorkAllDay: getBooleanValue(deviceWorkAllDay)
+                }
+            });
+        }, prisma);
         
         return formatResponse(res, 201, "System device created successfully", newDevice);
     } catch (error) {
@@ -198,8 +203,8 @@ async function createSystemDevice(req, res) {
             cleanupFile(req.file.path);
         }
         
-        if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
-            return formatResponse(res, 400, "System device with this name already exists", null, false);
+        if (error.message === "System device with this name already exists") {
+            return formatResponse(res, 400, error.message, null, false);
         }
         
         return handleServerError(res, error, "Error creating system device");
@@ -218,51 +223,50 @@ async function updateSystemDevice(req, res) {
             return formatResponse(res, 400, "Invalid device ID", null, false);
         }
         
-        const existingDevice = await prisma.systemDevice.findUnique({
-            where: { id: parseInt(id) }
-        });
-        
-        if (!existingDevice) {
-            if (req.file) {
-                cleanupFile(req.file.path);
-            }
-            return formatResponse(res, 404, "System device not found", null, false);
-        }
-        
-        // Prepare the update data
-        const updateData = {};
-        
-        if (name) updateData.name = name;
-        
-        if (wattsOptions) {
-            updateData.wattsOptions = parseWattsOptions(wattsOptions);
-        }
-        
-        if (deviceWorkAllDay !== undefined) {
-            updateData.deviceWorkAllDay = getBooleanValue(deviceWorkAllDay);
-        }
-
-        // Handle image update
-        if (req.file) {
-            // Delete old image if it exists
-            if (existingDevice.img && existingDevice.img.startsWith('/uploads/')) {
-                try {
-                    const oldImagePath = path.join(process.cwd(), existingDevice.img);
-                    cleanupFile(oldImagePath);
-                } catch (error) {
-                    console.error("Error deleting old image:", error);
-                }
+        const updatedDevice = await safeTransaction(async (prisma) => {
+            const existingDevice = await prisma.systemDevice.findUnique({
+                where: { id: parseInt(id) }
+            });
+            
+            if (!existingDevice) {
+                throw new Error("System device not found");
             }
             
-            // Generate the new image URL
-            updateData.img = `/uploads/images/${path.basename(req.file.path)}`;
-        }
-        
-        // Update the device
-        const updatedDevice = await prisma.systemDevice.update({
-            where: { id: parseInt(id) },
-            data: updateData
-        });
+            // Prepare the update data
+            const updateData = {};
+            
+            if (name) updateData.name = name;
+            
+            if (wattsOptions) {
+                updateData.wattsOptions = parseWattsOptions(wattsOptions);
+            }
+            
+            if (deviceWorkAllDay !== undefined) {
+                updateData.deviceWorkAllDay = getBooleanValue(deviceWorkAllDay);
+            }
+
+            // Handle image update
+            if (req.file) {
+                // Delete old image if it exists
+                if (existingDevice.img && existingDevice.img.startsWith('/uploads/')) {
+                    try {
+                        const oldImagePath = path.join(process.cwd(), existingDevice.img);
+                        cleanupFile(oldImagePath);
+                    } catch (error) {
+                        console.error("Error deleting old image:", error);
+                    }
+                }
+                
+                // Generate the new image URL
+                updateData.img = `/uploads/images/${path.basename(req.file.path)}`;
+            }
+            
+            // Update the device
+            return await prisma.systemDevice.update({
+                where: { id: parseInt(id) },
+                data: updateData
+            });
+        }, prisma);
         
         return formatResponse(res, 200, "System device updated successfully", updatedDevice);
     } catch (error) {
@@ -270,8 +274,8 @@ async function updateSystemDevice(req, res) {
             cleanupFile(req.file.path);
         }
         
-        if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
-            return formatResponse(res, 400, "System device with this name already exists", null, false);
+        if (error.message === "System device not found") {
+            return formatResponse(res, 404, error.message, null, false);
         }
         
         return handleServerError(res, error, "Error updating system device");
@@ -286,44 +290,43 @@ async function deleteSystemDevice(req, res) {
             return formatResponse(res, 400, "Invalid device ID", null, false);
         }
         
-        const existingDevice = await prisma.systemDevice.findUnique({
-            where: { id: parseInt(id) }
-        });
-        
-        if (!existingDevice) {
-            return formatResponse(res, 404, "System device not found", null, false);
-        }
-        
-        // Check for linked devices
-        const linkedDevicesCount = await prisma.userHomeDevice.count({
-            where: { systemDeviceId: parseInt(id) }
-        });
-        
-        if (linkedDevicesCount > 0) {
-            return formatResponse(
-                res, 
-                409, 
-                "Cannot delete device as it is linked to user home devices", 
-                null, 
-                false
-            );
-        }
-        
-        // Delete the image file if it exists
-        if (existingDevice.img && existingDevice.img.startsWith('/uploads/')) {
-            const imagePath = path.join(process.cwd(), existingDevice.img);
-            cleanupFile(imagePath);
-        }
-        
-        // Delete the device
-        await prisma.systemDevice.delete({
-            where: { id: parseInt(id) }
-        });
+        await safeTransaction(async (prisma) => {
+            const existingDevice = await prisma.systemDevice.findUnique({
+                where: { id: parseInt(id) }
+            });
+            
+            if (!existingDevice) {
+                throw new Error("System device not found");
+            }
+            
+            // Check for linked devices
+            const linkedDevicesCount = await prisma.userHomeDevice.count({
+                where: { systemDeviceId: parseInt(id) }
+            });
+            
+            if (linkedDevicesCount > 0) {
+                throw new Error("Cannot delete device as it is linked to user home devices");
+            }
+            
+            // Delete the image file if it exists
+            if (existingDevice.img && existingDevice.img.startsWith('/uploads/')) {
+                const imagePath = path.join(process.cwd(), existingDevice.img);
+                cleanupFile(imagePath);
+            }
+            
+            // Delete the device
+            await prisma.systemDevice.delete({
+                where: { id: parseInt(id) }
+            });
+        }, prisma);
         
         return formatResponse(res, 200, "System device deleted successfully");
     } catch (error) {
-        if (error.code === 'P2025') {
-            return formatResponse(res, 404, "System device not found", null, false);
+        if (error.message === "System device not found") {
+            return formatResponse(res, 404, error.message, null, false);
+        }
+        if (error.message === "Cannot delete device as it is linked to user home devices") {
+            return formatResponse(res, 409, error.message, null, false);
         }
         
         return handleServerError(res, error, "Error deleting system device");
@@ -340,86 +343,80 @@ async function searchSystemDevices(req, res) {
         const { page, limit, skip } = getPaginationParams(req.query);
         const { name, minWatts, maxWatts, deviceWorkAllDay } = req.query;
         
-        // Build filter conditions
-        const filterConditions = {};
-        
-        if (name) {
-            filterConditions.name = {
-                contains: name,
-                mode: 'insensitive'
-            };
-        }
-        
-        // Handle watts range filtering
-        if (minWatts || maxWatts) {
-            filterConditions.wattsOptions = {
-                hasSome: []
-            };
+        const result = await safeTransaction(async (prisma) => {
+            // Build filter conditions
+            const filterConditions = {};
             
-            // Get all devices to filter by watts range (since wattsOptions is an array)
-            const allDevices = await prisma.systemDevice.findMany();
-            
-            // Filter devices by wattsOptions
-            const filteredIds = allDevices
-                .filter(device => {
-                    const hasValidWatts = device.wattsOptions.some(watts => {
-                        if (minWatts && maxWatts) {
-                            return watts >= parseInt(minWatts) && watts <= parseInt(maxWatts);
-                        } else if (minWatts) {
-                            return watts >= parseInt(minWatts);
-                        } else if (maxWatts) {
-                            return watts <= parseInt(maxWatts);
-                        }
-                        return true;
-                    });
-                    return hasValidWatts;
-                })
-                .map(device => device.id);
-            
-            // Update filter to include only these IDs
-            if (filteredIds.length > 0) {
-                filterConditions.id = { in: filteredIds };
-            } else {
-                return formatResponse(res, 200, "No devices found matching criteria", {
-                    devices: [],
-                    pagination: {
-                        page,
-                        limit,
-                        totalCount: 0,
-                        totalPages: 0,
-                        hasNextPage: false,
-                        hasPrevPage: false
-                    }
-                });
+            if (name) {
+                filterConditions.name = {
+                    contains: name,
+                    mode: 'insensitive'
+                };
             }
             
-            // Remove the wattsOptions condition as we've applied it manually
-            delete filterConditions.wattsOptions;
-        }
+            // Handle watts range filtering
+            if (minWatts || maxWatts) {
+                filterConditions.wattsOptions = {
+                    hasSome: []
+                };
+                
+                // Get all devices to filter by watts range (since wattsOptions is an array)
+                const allDevices = await prisma.systemDevice.findMany();
+                
+                // Filter devices by wattsOptions
+                const filteredIds = allDevices
+                    .filter(device => {
+                        const hasValidWatts = device.wattsOptions.some(watts => {
+                            if (minWatts && maxWatts) {
+                                return watts >= parseInt(minWatts) && watts <= parseInt(maxWatts);
+                            } else if (minWatts) {
+                                return watts >= parseInt(minWatts);
+                            } else if (maxWatts) {
+                                return watts <= parseInt(maxWatts);
+                            }
+                            return true;
+                        });
+                        return hasValidWatts;
+                    })
+                    .map(device => device.id);
+                
+                // Update filter to include only these IDs
+                if (filteredIds.length > 0) {
+                    filterConditions.id = { in: filteredIds };
+                } else {
+                    return { devices: [], totalCount: 0 };
+                }
+                
+                // Remove the wattsOptions condition as we've applied it manually
+                delete filterConditions.wattsOptions;
+            }
+            
+            // Handle deviceWorkAllDay filtering
+            if (deviceWorkAllDay !== undefined) {
+                filterConditions.deviceWorkAllDay = getBooleanValue(deviceWorkAllDay);
+            }
+            
+            const [devices, totalCount] = await Promise.all([
+                prisma.systemDevice.findMany({
+                    where: filterConditions,
+                    skip,
+                    take: limit,
+                    orderBy: { id: 'desc' }
+                }),
+                prisma.systemDevice.count({ where: filterConditions })
+            ]);
+            
+            return { devices, totalCount };
+        }, prisma);
         
-        // Handle deviceWorkAllDay filtering
-        if (deviceWorkAllDay !== undefined) {
-            filterConditions.deviceWorkAllDay = getBooleanValue(deviceWorkAllDay);
-        }
-        
-        const [devices, totalCount] = await Promise.all([
-            prisma.systemDevice.findMany({
-                where: filterConditions,
-                skip,
-                take: limit,
-                orderBy: { id: 'desc' }
-            }),
-            prisma.systemDevice.count({ where: filterConditions })
-        ]);
-        
-        const totalPages = Math.ceil(totalCount / limit);
+        const totalPages = Math.ceil(result.totalCount / limit);
         
         return formatResponse(res, 200, "Search results retrieved successfully", {
-            devices,
+            devices: result.devices,
             pagination: {
                 page,
                 limit,
-                totalCount,
+                totalCount: result.totalCount,
                 totalPages,
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1

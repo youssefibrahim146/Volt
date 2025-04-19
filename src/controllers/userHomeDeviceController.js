@@ -53,15 +53,17 @@ async function addHomeDeviceToUser(req, res, next) {
                     userInputWorkTime: actualWorkTime
                 },
             });
-            
+            console.log(systemDevice.deviceWorkAllDay);
             if (systemDevice.deviceWorkAllDay) {
-                await prisma.user.update({
+             const updatedUser = await prisma.user.update({
                     where: { id: userId },
                     data: {
                         minBudget: { increment: calculateDeviceCost(watts, 24) },
                         totalWattage: { increment: watts }
                     }
                 });
+                console.log("updated user");
+                console.log(updatedUser);
             }
             
             return userHomeDevice;
