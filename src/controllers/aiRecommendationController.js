@@ -77,8 +77,6 @@ export async function getDeviceSpecificTips(req, res) {
 export async function analyzeConsumptionPatterns(req, res) {
   try {
     const userId = req.user.id;
-    // Implementation would involve analyzing historical data
-    // For now, return a placeholder response
 
     return formatResponse(
       res,
