@@ -30,6 +30,10 @@ import {
   getRecommendedDevices,
 } from "../controllers/userHomeDeviceController.js";
 
+import {
+  getAIDeviceRecommendations,
+  getDeviceSpecificTips,
+} from "../controllers/aiRecommendationController.js";
 const router = Router();
 
 router.post("/register", registerUser);
@@ -88,6 +92,9 @@ router.get(
   isAuthenticated,
   getRecommendedDevices
 );
+router.get("/ai/recommendations", isAuthenticated, getAIDeviceRecommendations);
+router.get("/ai/tips/:deviceId", isAuthenticated, getDeviceSpecificTips);
+
 router.use(errorHandler);
 
 export default router;

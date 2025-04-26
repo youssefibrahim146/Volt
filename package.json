@@ -20,6 +20,9 @@
   "homepage": "https://github.com/youssefibrahim146/Volt#readme",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@langchain/core": "^0.3.48",
+    "@langchain/google-genai": "^0.2.5",
     "@prisma/client": "^6.4.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
