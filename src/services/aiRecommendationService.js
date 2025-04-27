@@ -38,7 +38,7 @@ const createGeminiModel = () => {
   }
 
   // Get optional configuration from environment variables or use defaults
-  let modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-pro";
+  let modelName = process.env.GEMINI_MODEL_NAME || "gemini-1.5-flash";
 
   // Fix common model name format issues
   // Replace spaces with hyphens and ensure lowercase
