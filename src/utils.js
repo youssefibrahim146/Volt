@@ -4,23 +4,23 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const hashPassword = async (password) => {
-    const salt = await bcrypt.genSalt(10);
-    return await bcrypt.hash(password, salt);
-}
+  const salt = await bcrypt.genSalt(10);
+  return await bcrypt.hash(password, salt);
+};
 
 export const comparePassword = async (password, hash) => {
-    return await bcrypt.compare(password, hash);
-}
+  return await bcrypt.compare(password, hash);
+};
 
 export const generateToken = (user) => {
-    return jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-        expiresIn: "30d",
-    });
-}
+  return jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
+};
 
 export const verifyToken = (token) => {
-    return jwt.verify(token, process.env.JWT_SECRET);
-}
+  return jwt.verify(token, process.env.JWT_SECRET);
+};
 
 /**
  * Standardized API response formatter
@@ -31,13 +31,19 @@ export const verifyToken = (token) => {
  * @param {Boolean} success - Whether the request was successful
  * @returns {Object} Formatted response
  */
-export const formatResponse = (res, statusCode, message, data = null, success = true) => {
-    return res.status(statusCode).json({
-        status: success ? 'success' : 'error',
-        message,
-        data
-    });
-}
+export const formatResponse = (
+  res,
+  statusCode,
+  message,
+  data = null,
+  success = true
+) => {
+  return res.status(statusCode).json({
+    status: success ? "success" : "error",
+    message,
+    data,
+  });
+};
 
 /**
  * Parse pagination parameters from request query
@@ -45,29 +51,29 @@ export const formatResponse = (res, statusCode, message, data = null, success = 
  * @returns {Object} Pagination parameters
  */
 export const getPaginationParams = (query) => {
-    const page = parseInt(query.page) || 1;
-    const limit = parseInt(query.limit) || 10;
-    const skip = (page - 1) * limit;
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const skip = (page - 1) * limit;
 
-    return {
-        page,
-        limit,
-        skip
-    };
-}
+  return {
+    page,
+    limit,
+    skip,
+  };
+};
 
 /**
  * Calculates the cost of running a device based on its power consumption, usage time, and cost per kilowatt-hour.
  *
  * @param {number} watts - The power consumption of the device in watts.
  * @param {number} hours - The number of hours the device is used.
- * @param {number} [costPerKWh=0.068] - The cost per kilowatt-hour. Default is 0.068.
+ * @param {number} [costPerKWh=0.68] - The cost per kilowatt-hour. Default is 0.68.
  * @returns {number} The total cost of running the device.
  */
-export const calculateDeviceCost = (watts, hours, costPerKWh = 0.068) => {
-    const kWh = (watts * hours) / 1000;
-    return kWh * costPerKWh;
-}
+export const calculateDeviceCost = (watts, hours, costPerKWh = 0.68) => {
+  const kWh = (watts * hours) / 1000;
+  return kWh * costPerKWh;
+};
 
 /**
  * Safely parse a number from input, returning default value if parsing fails
@@ -76,10 +82,10 @@ export const calculateDeviceCost = (watts, hours, costPerKWh = 0.068) => {
  * @returns {number} Parsed number or default value
  */
 export const safeParseNumber = (value, defaultValue = 0) => {
-    if (value === null || value === undefined) return defaultValue;
-    const parsed = Number(value);
-    return isNaN(parsed) ? defaultValue : parsed;
-}
+  if (value === null || value === undefined) return defaultValue;
+  const parsed = Number(value);
+  return isNaN(parsed) ? defaultValue : parsed;
+};
 
 /**
  * Safely execute a database transaction with proper error handling
@@ -88,13 +94,13 @@ export const safeParseNumber = (value, defaultValue = 0) => {
  * @returns {Promise<any>} Result of the transaction
  */
 export const safeTransaction = async (fn, prisma) => {
-    try {
-        return await prisma.$transaction(fn);
-    } catch (error) {
-        console.error('Transaction error:', error);
-        throw error;
-    }
-}
+  try {
+    return await prisma.$transaction(fn);
+  } catch (error) {
+    console.error("Transaction error:", error);
+    throw error;
+  }
+};
 
 /**
  * Validate that required parameters are present
@@ -103,14 +109,19 @@ export const safeTransaction = async (fn, prisma) => {
  * @throws {Error} If any required parameter is missing
  */
 export const validateRequiredParams = (params, required) => {
-    const missing = required.filter(param => 
-        params[param] === undefined || params[param] === null || params[param] === ''
+  const missing = required.filter(
+    (param) =>
+      params[param] === undefined ||
+      params[param] === null ||
+      params[param] === ""
+  );
+
+  if (missing.length > 0) {
+    const error = new Error(
+      `Missing required parameters: ${missing.join(", ")}`
     );
-    
-    if (missing.length > 0) {
-        const error = new Error(`Missing required parameters: ${missing.join(', ')}`);
-        error.statusCode = 400;
-        error.name = 'ValidationError';
-        throw error;
-    }
-}
+    error.statusCode = 400;
+    error.name = "ValidationError";
+    throw error;
+  }
+};
